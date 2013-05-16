@@ -1,0 +1,26 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 10.00
+# Visual C++ Express 2008
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "SFML_Network_Server", "SFML_Network_Server\SFML_Network_Server.vcproj", "{F2FBDACF-2171-4B05-88DD-F3F28686981A}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Simple_Sender", "Simple_Sender\Simple_Sender.vcproj", "{94C5A41F-EEB3-4344-87E1-9DC462E2E36F}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Win32 = Debug|Win32
+		Release|Win32 = Release|Win32
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{F2FBDACF-2171-4B05-88DD-F3F28686981A}.Debug|Win32.ActiveCfg = Debug|Win32
+		{F2FBDACF-2171-4B05-88DD-F3F28686981A}.Debug|Win32.Build.0 = Debug|Win32
+		{F2FBDACF-2171-4B05-88DD-F3F28686981A}.Release|Win32.ActiveCfg = Release|Win32
+		{F2FBDACF-2171-4B05-88DD-F3F28686981A}.Release|Win32.Build.0 = Release|Win32
+		{94C5A41F-EEB3-4344-87E1-9DC462E2E36F}.Debug|Win32.ActiveCfg = Debug|Win32
+		{94C5A41F-EEB3-4344-87E1-9DC462E2E36F}.Debug|Win32.Build.0 = Debug|Win32
+		{94C5A41F-EEB3-4344-87E1-9DC462E2E36F}.Release|Win32.ActiveCfg = Release|Win32
+		{94C5A41F-EEB3-4344-87E1-9DC462E2E36F}.Release|Win32.Build.0 = Release|Win32
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal
