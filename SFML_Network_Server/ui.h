@@ -11,6 +11,8 @@
 extern sf::Mutex logMutex;
 extern sf::Mutex inputMutex;
 
+void writeToLog(const std::wstring str);
+
 struct inputThreadArgs;
 
 enum Colors;

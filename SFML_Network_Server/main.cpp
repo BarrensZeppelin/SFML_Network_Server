@@ -22,6 +22,7 @@ std::deque<std::wstring> log;
 
 const sf::Uint16 MAX_NAME_DISPLAY_LENGTH = 25;
 const sf::Uint32 MAX_LOG_LENGTH = 200;
+const sf::Uint16 LOG_INDENT = 3;
 
 
 int main(int argc, char * argv[]) {
@@ -42,9 +43,14 @@ int main(int argc, char * argv[]) {
 		CIniReader iniReader(".\\config.ini");
 		config.port = iniReader.ReadInteger("IPConfig", "port", 0);
 		config.max_connections = iniReader.ReadInteger("IPConfig", "max_connections", 6);
+		config.timeout = iniReader.ReadInteger("IPConfig", "timeout", 1000);
 
 		config.name = iniReader.ReadString("Server", "name", "Server");
 		config.password = iniReader.ReadString("Server", "password", "");
+
+		config.verbose_level = iniReader.ReadInteger("UI", "verbose_level", 1);
+		config.logToFile = iniReader.ReadBoolean("UI", "logToFile", false);
+		if(config.logToFile) {config.logFile.open("log.txt", std::fstream::app);}
 	}
 	
 	//Retrieve IP-adress
@@ -62,13 +68,12 @@ int main(int argc, char * argv[]) {
 		logMutex.unlock();
 
 
+
 		// This blocks the 'main' thread untill the uiThread quits
 		uiThread.wait();
 
 	} else {
-		logMutex.lock();
-		log.push_front(L"Error, shutting down. Press any key to continue.");
-		logMutex.unlock();
+		writeToLog(L"Error, shutting down. Press any key to continue.");
 	}
 	
 	

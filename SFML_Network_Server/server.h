@@ -9,11 +9,18 @@
 extern sf::Mutex logMutex;
 extern std::deque<std::wstring> log;
 
-class Client {
-	sf::Socket::Status status;
 
+class Client {
+
+	void disconnect();
+
+	sf::Mutex mutex;
+
+	sf::Uint16 ping;
 
 public:
+	enum PacketTypeIn {TCONNECT, PING};
+	enum PacketTypeOut {CONNECTRESPONSE, PINGRESPONSE};
 
 	bool Dead;
 
@@ -22,7 +29,7 @@ public:
 
 	bool isDead();
 
-	sf::Socket::Status getStatus();
+	sf::Uint16 getPing();
 
 	void listen();
 
@@ -46,7 +53,8 @@ private:
 
 
 public:
-	enum PacketType {CONNECT};
+	enum PacketTypeIn {CONNECT};
+	enum PacketTypeOut {CONNECTSUCCESS, CONNECTFAILURE};
 
 	static sf::Uint16 Port;
 
@@ -58,6 +66,8 @@ public:
 	static void runAccepter();
 
 	static void run();
+
+	static sf::Uint16 calcAvgPing();
 
 	static bool isSlotOpen(sf::Uint16 slot);
 

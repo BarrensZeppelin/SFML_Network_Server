@@ -1,11 +1,11 @@
 #include "config.h"
 
 #include "server.h"
+#include "ui.h"
 
 //// CLIENT
 
-Client::Client() : Socket(), Dead(true), listenThread(0) {
-	sf::Socket::Status status = sf::Socket::Status::Done;
+Client::Client() : Socket(), Dead(true), listenThread(0), mutex(), ping(0) {
 }
 
 Client::~Client() {
@@ -13,39 +13,67 @@ Client::~Client() {
 	delete listenThread;
 }
 
-sf::Socket::Status Client::getStatus() {
-	return status;
-}
 
 bool Client::isDead() {
 	return Dead;
 }
 
+sf::Uint16 Client::getPing() {
+	return ping;
+}
+
+void Client::disconnect() {
+	mutex.lock();
+	Dead = true;
+	mutex.unlock();
+
+	std::wstringstream ss; ss << "Socket {YDno. " << Socket.getLocalPort()-Server::Port << "} {RDdisconnected}.";
+	writeToLog(ss.str());
+
+	Socket.disconnect();
+}
+
 void Client::listen() {
 	while(!Dead) {
 		sf::Packet received;
-		status = Socket.receive(received);
+		sf::Socket::Status status = Socket.receive(received);
 		
 		if(status == sf::Socket::Status::Disconnected) {
-			Dead = true;
-			logMutex.lock();
-			std::wstringstream ss; ss << "Socket {YDno. " << Socket.getLocalPort()-Server::Port << "} {RDdisconnected}.";
-			log.push_front(ss.str());
-			logMutex.unlock();
-			Socket.disconnect();
+			disconnect();
 		} else if(status == sf::Socket::Status::Error) {
-			Dead = true;
-			logMutex.lock();
 			std::wstringstream ss; ss << "Error on socket {YDno. " << Socket.getLocalPort()-Server::Port << "}. {RDDisconnecting it}.";
-			log.push_front(ss.str());
-			logMutex.unlock();
-			Socket.disconnect();
+			writeToLog(ss.str());
+			
+			disconnect();
 		} else if(status == sf::Socket::Done) {
-			logMutex.lock();
-			std::string str;
-			received >> str; std::wstring wstr = std::wstring(str.begin(), str.end());
-			log.push_front(wstr);
-			logMutex.unlock();
+			
+			/////////// Handle received packet.
+			sf::Uint16 type;
+			received >> type;
+			
+			sf::Packet send;
+			sf::Socket::Status s(sf::Socket::Status::Done);
+			switch(type) {
+				case Client::PacketTypeIn::TCONNECT:
+					send << (sf::Uint16)Client::PacketTypeOut::CONNECTRESPONSE << (sf::Uint16)(Socket.getLocalPort()-Server::Port-1); // Send slot no. to client
+					s = Socket.send(send);
+					break;
+
+				case Client::PacketTypeIn::PING:
+					send << (sf::Uint16)Client::PacketTypeOut::PINGRESPONSE;
+					s = Socket.send(send);
+					break;
+			}
+			
+			// Disconnect socket if send fails
+			if(s == sf::Socket::Status::Disconnected) {
+				disconnect();
+			} else if(status == sf::Socket::Status::Error) {
+				std::wstringstream ss; ss << "Error on socket {YDno. " << Socket.getLocalPort()-Server::Port << "}. {RDDisconnecting it}.";
+				writeToLog(ss.str());
+				
+				disconnect();
+			}
 		}
 	}
 }
@@ -79,18 +107,16 @@ bool Server::init() {
 	} else {
 		Port = config.port;
 		if(Socket.bind(config.port) != sf::Socket::Done) {
-			logMutex.lock();
+
 			std::wstringstream ss; ss << L"{RDError:} Could not bind to port {YD" << config.port << L"}.";
-			log.push_front(ss.str());
-			logMutex.unlock();
+			writeToLog(ss.str());
+
 			return false;
 		}
 	}
 
-	logMutex.lock();
 	std::wstringstream ss; ss << L"Server assigned to port {YD" << Port << L"}";
-	log.push_front(ss.str());
-	logMutex.unlock();
+	writeToLog(ss.str());
 
 
 	Clients.resize(config.max_connections);
@@ -116,6 +142,8 @@ void Server::terminate() {
 
 	AccepterThread->terminate();
 	MainThread->wait();
+
+	if(config.logToFile) {config.logFile << std::endl; config.logFile.close();}
 }
 
 
@@ -126,37 +154,30 @@ void Server::runAccepter() {
 			if(isSlotOpen(i)) OpenSlot = i;
 		}
 
-		logMutex.lock();
+
 		{
 		std::wstringstream ss; ss << L"Started listen on port {YD" << Port+OpenSlot << L"}.";
-		log.push_front(ss.str());
+		writeToLog(ss.str());
 		}
-		logMutex.unlock();
 		
 		if(Listener.listen(Port+OpenSlot) != sf::Socket::Done) {
-			logMutex.lock();
 			{
 			std::wstringstream ss; ss << "{RDFailed to listen on port} {YD" << Port+OpenSlot << L"}";
-			log.push_front(ss.str());
+			writeToLog(ss.str());
 			}
-			logMutex.unlock();
 		} else {
 			delete Clients[OpenSlot-1];
 			Clients[OpenSlot-1] = new Client();
 			if(Listener.accept(Clients[OpenSlot-1]->Socket) != sf::Socket::Done) {
-				logMutex.lock();
 				{
 				std::wstringstream ss; ss << L"{RDFailed to accept incomming connection on slot} {YDno. " << OpenSlot << L"}.";
-				log.push_front(ss.str());
+				writeToLog(ss.str());
 				}
-				logMutex.unlock();
 			} else {
-				logMutex.lock();
 				{
 				std::wstringstream ss; ss << L"{GDClient connected} on port {YD" << OpenSlot+Port << L"}.";
-				log.push_front(ss.str());
+				writeToLog(ss.str());
 				}
-				logMutex.unlock();
 
 
 				Clients[OpenSlot-1]->Dead = false;
@@ -172,9 +193,7 @@ void Server::runAccepter() {
 }
 
 void Server::run() {
-	logMutex.lock();
-	log.push_front(L"Main Network Thread started.");
-	logMutex.unlock();
+	writeToLog(L"Main Network Thread started.");
 
 	sf::Clock clock;
 	while(Run) {
@@ -189,9 +208,26 @@ void Server::run() {
 			packet >> type;
 
 			switch(type) {
-				case Server::PacketType::CONNECT: // A guy is trying to connect to the public(server) port, guide him to an open slot.
+				case Server::PacketTypeIn::CONNECT: // A guy is trying to connect to the public(server) port, guide him to an open slot.
+					std::wstring password;
+					packet >> password;
+					
 					sf::Packet send;
-					send << (sf::Uint16)Listener.getLocalPort();
+
+					std::string ipString = ip.toString();
+
+					if(password.compare(config.password) == 0 || config.password.compare(L"") == 0) {
+						if(isFull()) {
+							writeToLog(std::wstring(L"{RDConnect error: Server full} - {YD") + std::wstring(ipString.begin(), ipString.end()) + L"}"); 
+							send << (sf::Uint16)Server::PacketTypeOut::CONNECTFAILURE << std::wstring(L"Server is full.");
+						} else {
+							send << (sf::Uint16)Server::PacketTypeOut::CONNECTSUCCESS << (sf::Uint16)Listener.getLocalPort();
+						}
+					} else {
+						writeToLog(std::wstring(L"{RDConnect error: Wrong password} - {YD") + std::wstring(ipString.begin(), ipString.end()) + L"}"); 
+						send << (sf::Uint16)Server::PacketTypeOut::CONNECTFAILURE << std::wstring(L"Connect error: Wrong password.");
+					}
+					
 
 					Socket.send(send, ip, port);
 					break;
@@ -210,13 +246,21 @@ void Server::run() {
 }
 
 
+sf::Uint16 Server::calcAvgPing() { //Weighted average
+	sf::Uint16 temp(0), count(0);
+	for(sf::Uint16 i = 0; i < Clients.size(); i++) {
+		if(!Clients.at(i)->isDead()) {temp+=Clients.at(i)->getPing()*Clients.at(i)->getPing(); count++;}
+	}
+	return temp/(count*count);
+}
+
+
 bool Server::isSlotOpen(sf::Uint16 slot) {
 	if(slot>0 && slot<=config.max_connections) {
 		return Clients[slot-1]->isDead();
 	} else {
-		logMutex.lock();
-		log.push_front(L"{RDInvalid slot request.}");
-		logMutex.unlock();
+		writeToLog(L"{RDInvalid slot request.}");
+
 		return false;
 	}
 }

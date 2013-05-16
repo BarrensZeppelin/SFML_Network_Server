@@ -41,6 +41,23 @@ void initColors() {
 }
 
 
+void writeToLog(const std::wstring str) {
+	logMutex.lock();
+	/*if(str.length() > config.bufferSize.X-LOG_INDENT*2) {
+		std::wstring s = str;
+		while(s.length() > 0) {
+			log.push_front(std::wstring(s.begin(), (s.length() > config.bufferSize.X-LOG_INDENT*2 ? s.begin()+config.bufferSize.X-LOG_INDENT*2 : s.end())));
+			s.erase(s.begin(), (s.length() > config.bufferSize.X-LOG_INDENT*2 ? s.begin()+config.bufferSize.X-LOG_INDENT*2 : s.end()));
+		}
+	} else {*/
+		log.push_front(str);
+	//}
+
+	if(config.logToFile) {std::string s = std::string(str.begin(), str.end()); config.logFile << s << std::endl;}
+	logMutex.unlock();
+}
+
+
 Colors charToColor(const wchar_t& c) {
 	switch(c) {
 		case L'D':
@@ -161,6 +178,7 @@ void uiLoop() {
 	SMALL_RECT windowSize = {0, 0, 99, 43};
 
 	COORD bufferSize = {100, 44};
+	config.bufferSize = bufferSize;
 
 	SetConsoleScreenBufferSize(wHnd, bufferSize);
 	SetConsoleScreenBufferSize(rHnd, bufferSize);
@@ -203,9 +221,7 @@ void uiLoop() {
 				log.push_front(L"{YDLog cleared.}");
 				logMutex.unlock();
 			} else {
-				logMutex.lock();
-				log.push_front(std::wstring(L"{RDUnknown Command ('") + command + L"')}"); 
-				logMutex.unlock();
+				writeToLog(std::wstring(L"{RDUnknown Command ('") + command + L"')}"); 
 			}
 		}
 
@@ -289,33 +305,43 @@ void uiLoop() {
 			
 			logMutex.lock();
 			if(log.size()>=log_display_rows) {
-				COORD pos = {3, bufferSize.Y-3 - log_display_rows};
+				COORD pos = {LOG_INDENT, bufferSize.Y-3 - log_display_rows};
 				parseStringToBuffer(buffer, bufferSize, pos, L"vvv");
 			}
-
-			for(sf::Uint32 i = 0; i<log.size() && i<log_display_rows; i++) {
+			
+			sf::Uint16 y = 0;
+			for(sf::Uint32 i = 0; i<log.size() && y<log_display_rows; i++) {
 				
-				COORD pos = {3, bufferSize.Y-3 - i};
-				parseStringToBuffer(buffer, bufferSize, pos, log.at(i));
+				sf::Uint16 u = (unsigned int)(float(log.at(i).length())/(bufferSize.X-LOG_INDENT));
+				y+=u;
+
+				COORD pos = {LOG_INDENT, bufferSize.Y-3-y};
+				parseStringToBuffer(buffer, bufferSize, pos, log.at(i), true);
+				y++;
 			}
 			logMutex.unlock();
 
 			{
-				COORD pos = {3, bufferSize.Y-2};
+				COORD pos = {LOG_INDENT, bufferSize.Y-2};
 				parseStringToBuffer(buffer, bufferSize, pos, L"^^^");
 			}
 		}
 
+		{ //Bottom input line
+			for(sf::Uint16 i = bufferSize.X*(bufferSize.Y-1); i < bufferSize.X*(bufferSize.Y); i++) {
+				buffer[i].Attributes = bColors[W] | fColors[D];
+			}
 
-		{ //Draw input arrow
-			COORD pos = {1, bufferSize.Y-1};
-			parseStringToBuffer(buffer, bufferSize, pos, L"> ");
-		}
+			{ //Draw input arrow
+				COORD pos = {1, bufferSize.Y-1};
+				parseStringToBuffer(buffer, bufferSize, pos, L"> ");
+			}
 
-		{ //Draw current input
-			COORD pos = {3, bufferSize.Y-1};
-			std::wstring s(L"{GW");
-			parseStringToBuffer(buffer, bufferSize, pos, s.append((*args.input)).append(L"}"));
+			{ //Draw current input
+				COORD pos = {3, bufferSize.Y-1};
+				std::wstring s(L"{MW");
+				parseStringToBuffer(buffer, bufferSize, pos, s.append((*args.input)).append(L"}"));
+			}
 		}
 
 
