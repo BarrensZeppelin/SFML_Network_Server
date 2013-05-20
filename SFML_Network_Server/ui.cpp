@@ -1,5 +1,6 @@
 #include "config.h"
 
+#include "client.h"
 #include "server.h"
 #include "ui.h"
 
@@ -46,11 +47,11 @@ void writeToLog(const std::wstring str) {
 	/*if(str.length() > config.bufferSize.X-LOG_INDENT*2) {
 		std::wstring s = str;
 		while(s.length() > 0) {
-			log.push_front(std::wstring(s.begin(), (s.length() > config.bufferSize.X-LOG_INDENT*2 ? s.begin()+config.bufferSize.X-LOG_INDENT*2 : s.end())));
+			output.push_front(std::wstring(s.begin(), (s.length() > config.bufferSize.X-LOG_INDENT*2 ? s.begin()+config.bufferSize.X-LOG_INDENT*2 : s.end())));
 			s.erase(s.begin(), (s.length() > config.bufferSize.X-LOG_INDENT*2 ? s.begin()+config.bufferSize.X-LOG_INDENT*2 : s.end()));
 		}
 	} else {*/
-		log.push_front(str);
+		output.push_front(str);
 	//}
 
 	if(config.logToFile) {std::string s = std::string(str.begin(), str.end()); config.logFile << s << std::endl;}
@@ -217,8 +218,8 @@ void uiLoop() {
 				inputThread.terminate();
 			} else if(command.compare(L"clear") == 0) {
 				logMutex.lock();
-				log.clear();
-				log.push_front(L"{YDLog cleared.}");
+				output.clear();
+				output.push_front(L"{YDLog cleared.}");
 				logMutex.unlock();
 			} else {
 				writeToLog(std::wstring(L"{RDUnknown Command ('") + command + L"')}"); 
@@ -247,13 +248,13 @@ void uiLoop() {
 					std::wstringstream ss;
 					ss << L"{RD" << config.name << L"}";
 					std::wstring str = ss.str();
-					if(str.length() > MAX_NAME_DISPLAY_LENGTH) {str.erase(str.end()-4, str.end()); str.append(L"...}");}
+					if(str.length() > MAX_SERVERNAME_DISPLAY_LENGTH) {str.erase(str.end()-4, str.end()); str.append(L"...}");}
 					parseStringToBuffer(buffer, bufferSize, pos, str);
 				}
 				
 				sf::Uint16 ipStrLen = 0;
 				{
-					COORD pos = {1+MAX_NAME_DISPLAY_LENGTH+4, 0};
+					COORD pos = {1+MAX_SERVERNAME_DISPLAY_LENGTH+4, 0};
 					std::string ip = config.IP.toString();
 					std::wstringstream ss;
 					ss << L"{RD" << std::wstring(ip.begin(), ip.end()) << L":" << Server::Port << L"}";
@@ -262,9 +263,9 @@ void uiLoop() {
 				}
 
 				{
-					COORD pos = {1+MAX_NAME_DISPLAY_LENGTH+4+ipStrLen+4, 0};
+					COORD pos = {1+MAX_SERVERNAME_DISPLAY_LENGTH+4+ipStrLen+4, 0};
 					std::wstringstream ss;
-					ss << L"{RDSlots:} "; if(Server::isFull()) ss << L"{RD"; else ss << L"{GD"; ss << config.max_connections-Server::getSlotsOpen() << L"/" << config.max_connections << L"}";
+					//ss << L"{RDSlots:} "; if(Server::isFull()) ss << L"{RD"; else ss << L"{GD"; ss << config.max_connections-Server::getSlotsOpen() << L"/" << config.max_connections << L"}";
 					parseStringToBuffer(buffer, bufferSize, pos, ss.str());
 				}
 
@@ -277,7 +278,7 @@ void uiLoop() {
 					std::wstringstream ess;
 					ess << elapsed;
 					std::wstring eString(ess.str());
-					if(eString.length()>MAX_NAME_DISPLAY_LENGTH) eString = L">999";
+					if(eString.length()>MAX_SERVERNAME_DISPLAY_LENGTH) eString = L">999";
 					else {
 						for(sf::Uint16 i = 0; i<4-eString.length(); i++) {
 							ss << L" ";
@@ -304,19 +305,19 @@ void uiLoop() {
 			sf::Uint16 log_display_rows = bufferSize.Y - 3 - 10;
 			
 			logMutex.lock();
-			if(log.size()>=log_display_rows) {
+			if(output.size()>=log_display_rows) {
 				COORD pos = {LOG_INDENT, bufferSize.Y-3 - log_display_rows};
 				parseStringToBuffer(buffer, bufferSize, pos, L"vvv");
 			}
 			
 			sf::Uint16 y = 0;
-			for(sf::Uint32 i = 0; i<log.size() && y<log_display_rows; i++) {
+			for(sf::Uint32 i = 0; i<output.size() && y<log_display_rows; i++) {
 				
-				sf::Uint16 u = (unsigned int)(float(log.at(i).length())/(bufferSize.X-LOG_INDENT));
+				sf::Uint16 u = (unsigned int)(float(output.at(i).length())/(bufferSize.X-LOG_INDENT));
 				y+=u;
 
 				COORD pos = {LOG_INDENT, bufferSize.Y-3-y};
-				parseStringToBuffer(buffer, bufferSize, pos, log.at(i), true);
+				parseStringToBuffer(buffer, bufferSize, pos, output.at(i), true);
 				y++;
 			}
 			logMutex.unlock();

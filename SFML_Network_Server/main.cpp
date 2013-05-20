@@ -12,17 +12,21 @@
 
 
 #include "config.h"
+
+#include "client.h"
 #include "server.h"																								
 #include "ui.h"
 
 sf::Mutex logMutex;
 Config config;
 
-std::deque<std::wstring> log;
+std::deque<std::wstring> output;
 
-const sf::Uint16 MAX_NAME_DISPLAY_LENGTH = 25;
+const sf::Uint16 MAX_SERVERNAME_DISPLAY_LENGTH = 25;
 const sf::Uint32 MAX_LOG_LENGTH = 200;
 const sf::Uint16 LOG_INDENT = 3;
+
+const sf::Uint16 MAX_CLIENTNAME_LENGTH = 32;
 
 
 int main(int argc, char * argv[]) {
@@ -50,7 +54,7 @@ int main(int argc, char * argv[]) {
 
 		config.verbose_level = iniReader.ReadInteger("UI", "verbose_level", 1);
 		config.logToFile = iniReader.ReadBoolean("UI", "logToFile", false);
-		if(config.logToFile) {config.logFile.open("log.txt", std::fstream::app);}
+		if(config.logToFile) {config.logFile.open("output.txt", std::fstream::app);}
 	}
 	
 	//Retrieve IP-adress
@@ -58,13 +62,15 @@ int main(int argc, char * argv[]) {
 	if(config.IP == sf::IpAddress::None) {config.IP = sf::IpAddress::getLocalAddress();}
 
 	if(Server::init()) {
+		//sf::sleep(sf::milliseconds(1000));
+
 		sf::Thread uiThread(uiLoop);
 		uiThread.launch();
 
 		
 		logMutex.lock();
-		log.push_front(L"Server successfully started!");
-		for(sf::Uint16 i=0; i<4; i++) {log.push_front(L"");}
+		output.push_front(L"Server successfully started!");
+		for(sf::Uint16 i=0; i<4; i++) {output.push_front(L"");}
 		logMutex.unlock();
 
 

@@ -7,35 +7,7 @@
 #include <sstream>
 
 extern sf::Mutex logMutex;
-extern std::deque<std::wstring> log;
-
-
-class Client {
-
-	void disconnect();
-
-	sf::Mutex mutex;
-
-	sf::Uint16 ping;
-
-public:
-	enum PacketTypeIn {TCONNECT, PING};
-	enum PacketTypeOut {CONNECTRESPONSE, PINGRESPONSE};
-
-	bool Dead;
-
-	sf::TcpSocket Socket;
-	sf::Thread * listenThread;
-
-	bool isDead();
-
-	sf::Uint16 getPing();
-
-	void listen();
-
-	Client();
-	~Client();
-};
+extern std::deque<std::wstring> output;
 
 
 //Pure static
@@ -50,6 +22,8 @@ private:
 
 	static bool Run;
 	static bool Listening;
+
+	static sf::Mutex clientAccess;
 
 
 public:

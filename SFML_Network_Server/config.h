@@ -35,6 +35,8 @@ struct Config {
 extern Config config;
 
 
-extern const sf::Uint16 MAX_NAME_DISPLAY_LENGTH;
+extern const sf::Uint16 MAX_SERVERNAME_DISPLAY_LENGTH;
 extern const sf::Uint32 MAX_LOG_LENGTH;
 extern const sf::Uint16 LOG_INDENT;
+
+extern const sf::Uint16 MAX_CLIENTNAME_LENGTH;

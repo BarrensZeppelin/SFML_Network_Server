@@ -1,83 +1,8 @@
 #include "config.h"
 
+#include "client.h"
 #include "server.h"
 #include "ui.h"
-
-//// CLIENT
-
-Client::Client() : Socket(), Dead(true), listenThread(0), mutex(), ping(0) {
-}
-
-Client::~Client() {
-	if(listenThread!=0) listenThread->wait();
-	delete listenThread;
-}
-
-
-bool Client::isDead() {
-	return Dead;
-}
-
-sf::Uint16 Client::getPing() {
-	return ping;
-}
-
-void Client::disconnect() {
-	mutex.lock();
-	Dead = true;
-	mutex.unlock();
-
-	std::wstringstream ss; ss << "Socket {YDno. " << Socket.getLocalPort()-Server::Port << "} {RDdisconnected}.";
-	writeToLog(ss.str());
-
-	Socket.disconnect();
-}
-
-void Client::listen() {
-	while(!Dead) {
-		sf::Packet received;
-		sf::Socket::Status status = Socket.receive(received);
-		
-		if(status == sf::Socket::Status::Disconnected) {
-			disconnect();
-		} else if(status == sf::Socket::Status::Error) {
-			std::wstringstream ss; ss << "Error on socket {YDno. " << Socket.getLocalPort()-Server::Port << "}. {RDDisconnecting it}.";
-			writeToLog(ss.str());
-			
-			disconnect();
-		} else if(status == sf::Socket::Done) {
-			
-			/////////// Handle received packet.
-			sf::Uint16 type;
-			received >> type;
-			
-			sf::Packet send;
-			sf::Socket::Status s(sf::Socket::Status::Done);
-			switch(type) {
-				case Client::PacketTypeIn::TCONNECT:
-					send << (sf::Uint16)Client::PacketTypeOut::CONNECTRESPONSE << (sf::Uint16)(Socket.getLocalPort()-Server::Port-1); // Send slot no. to client
-					s = Socket.send(send);
-					break;
-
-				case Client::PacketTypeIn::PING:
-					send << (sf::Uint16)Client::PacketTypeOut::PINGRESPONSE;
-					s = Socket.send(send);
-					break;
-			}
-			
-			// Disconnect socket if send fails
-			if(s == sf::Socket::Status::Disconnected) {
-				disconnect();
-			} else if(status == sf::Socket::Status::Error) {
-				std::wstringstream ss; ss << "Error on socket {YDno. " << Socket.getLocalPort()-Server::Port << "}. {RDDisconnecting it}.";
-				writeToLog(ss.str());
-				
-				disconnect();
-			}
-		}
-	}
-}
-
 
 //// SERVER
 
@@ -87,6 +12,8 @@ sf::TcpListener Server::Listener = sf::TcpListener();
 
 sf::Thread * Server::AccepterThread = 0;
 sf::Thread * Server::MainThread = 0;
+
+sf::Mutex Server::clientAccess = sf::Mutex();
 
 bool Server::Run = true;
 bool Server::Listening = false;
@@ -166,8 +93,12 @@ void Server::runAccepter() {
 			writeToLog(ss.str());
 			}
 		} else {
+			
+			clientAccess.lock();
 			delete Clients[OpenSlot-1];
 			Clients[OpenSlot-1] = new Client();
+			clientAccess.unlock();
+
 			if(Listener.accept(Clients[OpenSlot-1]->Socket) != sf::Socket::Done) {
 				{
 				std::wstringstream ss; ss << L"{RDFailed to accept incomming connection on slot} {YDno. " << OpenSlot << L"}.";
@@ -197,10 +128,12 @@ void Server::run() {
 
 	sf::Clock clock;
 	while(Run) {
-		if(!isFull() && !Listening) {
-			Listening = true;
-			AccepterThread->launch();
-		}
+		//if(clock.getElapsedTime().asSeconds() >= 1) { //Debug delay to fix mutex access violations
+			if(!isFull() && !Listening) {
+				Listening = true;
+				AccepterThread->launch();
+			}
+		//}
 
 		sf::Packet packet; sf::IpAddress ip; sf::Uint16 port;
 		if(Socket.receive(packet, ip, port) == sf::Socket::Done) {
@@ -236,12 +169,6 @@ void Server::run() {
 					break;
 			}
 		}
-		
-		if(clock.getElapsedTime().asSeconds()>1) {
-			//if(rand()%2 == 0) {std::cout << "tick" << std::endl;} else {std::cout << "tock" << std::endl;}
-			//std::cout << Listener.getLocalPort() << std::endl;
-			clock.restart();
-		}
 	}
 }
 
@@ -257,6 +184,7 @@ sf::Uint16 Server::calcAvgPing() { //Weighted average
 
 bool Server::isSlotOpen(sf::Uint16 slot) {
 	if(slot>0 && slot<=config.max_connections) {
+		sf::Lock lock(clientAccess);
 		return Clients[slot-1]->isDead();
 	} else {
 		writeToLog(L"{RDInvalid slot request.}");
