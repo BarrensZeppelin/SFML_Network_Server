@@ -20,18 +20,18 @@ class Client {
 	ClientData data;
 
 public:
-	enum PacketTypeIn {TCONNECT, PING};
-	enum PacketTypeOut {CONNECTRESPONSE, PINGRESPONSE};
-
 	bool Dead;
+	sf::Uint16 getPing();
+	void setPing(sf::Uint16 Ping);
+	
+	bool handleTCPPacket(sf::Packet& packet);
 
 	sf::TcpSocket Socket;
 	sf::Thread * listenThread;
 
 	bool isDead();
 
-	sf::Uint16 getPing();
-
+	
 	ClientData& getData();
 	void freeDataAccess();
 

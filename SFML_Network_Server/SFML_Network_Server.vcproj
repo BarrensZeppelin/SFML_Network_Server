@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="Windows-1252"?>
 <VisualStudioProject
 	ProjectType="Visual C++"
-	Version="9.00"
+	Version="9,00"
 	Name="SFML_Network_Server"
 	ProjectGUID="{F2FBDACF-2171-4B05-88DD-F3F28686981A}"
 	RootNamespace="SFML_Network_Server"
@@ -189,6 +189,10 @@
 				>
 			</File>
 			<File
+				RelativePath=".\packetHandling.cpp"
+				>
+			</File>
+			<File
 				RelativePath=".\server.cpp"
 				>
 			</File>
@@ -216,6 +220,10 @@
 			</File>
 			<File
 				RelativePath="..\..\includes\IniTools\IniWriter.h"
+				>
+			</File>
+			<File
+				RelativePath=".\packetHandling.h"
 				>
 			</File>
 			<File

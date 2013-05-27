@@ -255,7 +255,8 @@ void uiLoop() {
 				sf::Uint16 ipStrLen = 0;
 				{
 					COORD pos = {1+MAX_SERVERNAME_DISPLAY_LENGTH+4, 0};
-					std::string ip = config.IP.toString();
+					std::string ip;
+					if(config.PublicIP != sf::IpAddress::None) ip = config.PublicIP.toString(); else ip = config.LocalIP.toString();
 					std::wstringstream ss;
 					ss << L"{RD" << std::wstring(ip.begin(), ip.end()) << L":" << Server::Port << L"}";
 					parseStringToBuffer(buffer, bufferSize, pos, ss.str());
@@ -265,26 +266,46 @@ void uiLoop() {
 				{
 					COORD pos = {1+MAX_SERVERNAME_DISPLAY_LENGTH+4+ipStrLen+4, 0};
 					std::wstringstream ss;
-					//ss << L"{RDSlots:} "; if(Server::isFull()) ss << L"{RD"; else ss << L"{GD"; ss << config.max_connections-Server::getSlotsOpen() << L"/" << config.max_connections << L"}";
+					ss << L"{RDSlots:} "; if(Server::isFull()) ss << L"{RD"; else ss << L"{GD"; ss << config.max_connections-Server::getSlotsOpen() << L"/" << config.max_connections << L"}";
+					parseStringToBuffer(buffer, bufferSize, pos, ss.str());
+				}
+
+				
+				{
+					std::wstringstream ss;
+					ss << L"{RDAvg. lag:} {YD";
+
+					std::wstringstream pingss;
+					pingss << Server::calcAvgPing();
+					std::wstring pingstring(pingss.str());
+					if(pingstring.length() > 3) pingstring = L">999";
+					else {
+						for(sf::Uint16 i = 0; i<4-pingstring.length(); i++) {
+							ss << L" ";
+						}
+					}
+					ss << pingstring << L"}{RDms}";
+
+					COORD pos = {bufferSize.X - 28, 0};
 					parseStringToBuffer(buffer, bufferSize, pos, ss.str());
 				}
 
 
 				{
 					std::wstringstream ss;
-					ss << "{RDUI: ";
+					ss << "{RDUI:} {YD";
 
 					sf::Int32 elapsed = frameClock.restart().asMilliseconds();
 					std::wstringstream ess;
 					ess << elapsed;
 					std::wstring eString(ess.str());
-					if(eString.length()>MAX_SERVERNAME_DISPLAY_LENGTH) eString = L">999";
+					if(eString.length() > 3) eString = L">999";
 					else {
 						for(sf::Uint16 i = 0; i<4-eString.length(); i++) {
 							ss << L" ";
 						}
 					}
-					ss << eString << L"ms}";
+					ss << eString << L"}{RDms}";
 					
 					COORD pos = {bufferSize.X - 10, 0};
 					parseStringToBuffer(buffer, bufferSize, pos, ss.str());

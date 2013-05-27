@@ -4,20 +4,15 @@
 
 #include <SFML\Network.hpp>
 
-enum UdpPacketTypeOut {CONNECT};
-enum UdpPacketTypeIn {CONNECTSUCCESS, CONNECTFAILURE};
+enum UdpPacketTypeOut {CONNECT, PING};
+enum UdpPacketTypeIn {CONNECTSUCCESS, CONNECTFAILURE, PINGRESPONSE};
 
-enum TcpPacketTypeOut {TCONNECT, PING};
-enum TcpPacketTypeIn {CONNECTRESPONSE, PINGRESPONSE};
+enum TcpPacketTypeOut {TCONNECT, TPING};
+enum TcpPacketTypeIn {CONNECTRESPONSE, TPINGRESPONSE};
 
 
-sf::Uint16 ping = 0;
-
-void Ping(bool* run) {
-	while(*run) {
-		
-	}
-}
+sf::Uint16 TcpPing = 0;
+sf::Uint16 UdpPing = 0;
 
 int main(int argc, char* argv[]) {
 	sf::Uint16 port = 0;
@@ -74,13 +69,15 @@ int main(int argc, char* argv[]) {
 			std::cout << "Connected." << std::endl;
 
 			// Send a message to the connected host
+			{
 			sf::Packet packet;
 			packet << (sf::Uint16)TcpPacketTypeOut::TCONNECT;
 			socket.send(packet);
+			}
 
 			sf::Packet receive;
 			status = socket.receive(receive);
-			while(status == sf::Socket::Status::Done) {
+			if(status == sf::Socket::Status::Done) {
 				sf::Uint16 type;
 				receive >> type;
 
@@ -91,7 +88,33 @@ int main(int argc, char* argv[]) {
 						break;
 				}
 
-				status = socket.receive(packet);
+
+				sf::Clock pingClock;
+				bool run = true;
+				while(run) {
+					sf::Packet packet;
+					packet << (sf::Uint16)UdpPacketTypeOut::PING << slot << UdpPing;
+					pingClock.restart();
+					status = udpSock.send(packet, ip, port);
+					
+					if(status == sf::Socket::Done) {
+						packet = sf::Packet();
+						
+						sf::Socket::Status s = udpSock.receive(packet, ip, port);
+						if(s == sf::Socket::Done) {
+							packet >> type;
+							if(type == UdpPacketTypeIn::PINGRESPONSE) {
+								UdpPing = pingClock.restart().asMilliseconds();
+								std::cout << UdpPing << std::endl;
+								sf::sleep(sf::milliseconds(100));
+							}
+						} else {
+							run = false;
+						}
+					} else {
+						run = false;
+					}
+				}
 			}
 			
 			socket.disconnect();

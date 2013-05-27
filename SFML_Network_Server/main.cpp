@@ -40,6 +40,11 @@ int main(int argc, char * argv[]) {
 		iniWriter.WriteInteger("IPConfig", "port", 0);
 		iniWriter.WriteInteger("IPConfig", "max_connections", 6);
 
+		iniWriter.WriteString("Server", "name", "SFML Network Server");
+		iniWriter.WriteString("Server", "password", "");
+
+		iniWriter.WriteInteger("UI", "verbose_level", 1);
+		iniWriter.WriteBoolean("UI", "logToFile", false);
 		std::cout << "Created config.ini" << std::endl;
 	} else {configFile.close();}
 	
@@ -47,7 +52,7 @@ int main(int argc, char * argv[]) {
 		CIniReader iniReader(".\\config.ini");
 		config.port = iniReader.ReadInteger("IPConfig", "port", 0);
 		config.max_connections = iniReader.ReadInteger("IPConfig", "max_connections", 6);
-		config.timeout = iniReader.ReadInteger("IPConfig", "timeout", 1000);
+		//config.timeout = iniReader.ReadInteger("IPConfig", "timeout", 1000);
 
 		config.name = iniReader.ReadString("Server", "name", "Server");
 		config.password = iniReader.ReadString("Server", "password", "");
@@ -58,8 +63,8 @@ int main(int argc, char * argv[]) {
 	}
 	
 	//Retrieve IP-adress
-	//config.IP = sf::IpAddress::getPublicAddress(sf::milliseconds(500));
-	if(config.IP == sf::IpAddress::None) {config.IP = sf::IpAddress::getLocalAddress();}
+	config.PublicIP = sf::IpAddress::getPublicAddress(sf::milliseconds(500));
+	if(config.LocalIP == sf::IpAddress::None) {config.LocalIP = sf::IpAddress::getLocalAddress();}
 
 	if(Server::init()) {
 		//sf::sleep(sf::milliseconds(1000));
@@ -81,8 +86,6 @@ int main(int argc, char * argv[]) {
 	} else {
 		writeToLog(L"Error, shutting down. Press any key to continue.");
 	}
-	
-	
 	
 	Server::terminate();
 	

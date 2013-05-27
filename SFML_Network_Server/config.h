@@ -5,11 +5,13 @@
 
 struct Config {
 	// Run-time config
-	sf::IpAddress IP;
+	sf::IpAddress LocalIP;
+	sf::IpAddress PublicIP;
 
 	std::fstream logFile;
 
 	COORD bufferSize;
+
 
 	//IPConfig
 	sf::Uint16 port;
@@ -29,7 +31,7 @@ struct Config {
 
 	bool logToFile;
 
-	Config() : port(0), max_connections(0), timeout(), name(), password(), IP(sf::IpAddress::None), verbose_level(0), logToFile(false), logFile(), bufferSize() {}
+	Config() : port(0), max_connections(0), timeout(), name(), password(), LocalIP(sf::IpAddress::None), PublicIP(sf::IpAddress::None), verbose_level(0), logToFile(false), logFile(), bufferSize() {}
 };
 
 extern Config config;

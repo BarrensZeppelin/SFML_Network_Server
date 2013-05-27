@@ -10,6 +10,9 @@
 
 #include "client.h"
 #include "server.h"
+
+#include "packetHandling.h"
+
 #include "ui.h"
 
 
@@ -21,11 +24,14 @@ ClientData::ClientData() {
 
 
 Client::Client() : Socket(), Dead(true), listenThread(0), dataMutex(), cMutex(), ping(0), data() {
+	//Socket.setBlocking(false); If I want a non-blocking socket, I will have to make a thread which sends packets in a non-blocking way (NOTREADY handling)
 }
 
 Client::~Client() {
 	if(listenThread!=0) listenThread->wait();
 	delete listenThread;
+
+	Socket.disconnect();
 }
 
 
@@ -51,6 +57,12 @@ sf::Uint16 Client::getPing() {
 	return ping;
 }
 
+void Client::setPing(sf::Uint16 Ping) {
+	cMutex.lock();
+	ping = Ping;
+	cMutex.unlock();
+}
+
 void Client::disconnect() {
 	cMutex.lock();
 	Dead = true;
@@ -63,46 +75,34 @@ void Client::disconnect() {
 }
 
 void Client::listen() {
-	while(!Dead) {
+	cMutex.lock();
+	bool d = Dead;
+	cMutex.unlock();
+	
+	
+	while(!d) {
 		sf::Packet received;
 		sf::Socket::Status status = Socket.receive(received);
 		
-		if(status == sf::Socket::Status::Disconnected) {
+		if(status == sf::Socket::Disconnected) {
 			disconnect();
-		} else if(status == sf::Socket::Status::Error) {
+		} else if(status == sf::Socket::Error) {
 			std::wstringstream ss; ss << "Error on socket {YDno. " << Socket.getLocalPort()-Server::Port << "}. {RDDisconnecting it}.";
 			writeToLog(ss.str());
 			
 			disconnect();
 		} else if(status == sf::Socket::Done) {
 			
-			/////////// Handle received packet.
-			sf::Uint16 type;
-			received >> type;
-			
-			sf::Packet send;
-			sf::Socket::Status s(sf::Socket::Status::Done);
-			switch(type) {
-				case Client::PacketTypeIn::TCONNECT:
-					send << (sf::Uint16)Client::PacketTypeOut::CONNECTRESPONSE << (sf::Uint16)(Socket.getLocalPort()-Server::Port-1); // Send slot no. to client
-					s = Socket.send(send);
-					break;
-
-				case Client::PacketTypeIn::PING:
-					send << (sf::Uint16)Client::PacketTypeOut::PINGRESPONSE;
-					s = Socket.send(send);
-					break;
-			}
-			
-			// Disconnect socket if send fails
-			if(s == sf::Socket::Status::Disconnected) {
-				disconnect();
-			} else if(status == sf::Socket::Status::Error) {
-				std::wstringstream ss; ss << "Error on socket {YDno. " << Socket.getLocalPort()-Server::Port << "}. {RDDisconnecting it}.";
+			if(handleTCPPacket(received)) {
+				//Success
+			} else {
+				std::wstringstream ss; ss << L"Packet error on slot {YDno. " << Socket.getLocalPort()-Server::Port << L"}.";
 				writeToLog(ss.str());
-				
-				disconnect();
 			}
 		}
+
+		cMutex.lock();
+		d = Dead;
+		cMutex.unlock();
 	}
 }

@@ -2,6 +2,9 @@
 
 #include "client.h"
 #include "server.h"
+
+#include "packetHandling.h"
+
 #include "ui.h"
 
 //// SERVER
@@ -12,6 +15,7 @@ sf::TcpListener Server::Listener = sf::TcpListener();
 
 sf::Thread * Server::AccepterThread = 0;
 sf::Thread * Server::MainThread = 0;
+sf::Thread * Server::PacketQueueThread = 0;
 
 sf::Mutex Server::clientAccess = sf::Mutex();
 
@@ -56,6 +60,9 @@ bool Server::init() {
 	MainThread = new sf::Thread(&Server::run);
 	MainThread->launch();
 
+	PacketQueueThread = new sf::Thread(&Server::handlePacketQueue);
+	PacketQueueThread->launch();
+
 	return true;
 }
 
@@ -63,12 +70,15 @@ bool Server::init() {
 void Server::terminate() {
 	Run = false;
 
+	
+	AccepterThread->terminate();
+	PacketQueueThread->wait();
+	MainThread->wait();
+
 	for(sf::Uint16 i = 0; i<Clients.size(); i++) {
-		delete Clients[i];
+		delete Clients[i]; //This deadlocks the process when clients are connected due to the Client's TCP socket being set to Blocking mode. It then listens for packets to arrive, and calls wait() on the listenThread
 	}
 
-	AccepterThread->terminate();
-	MainThread->wait();
 
 	if(config.logToFile) {config.logFile << std::endl; config.logFile.close();}
 }
@@ -128,45 +138,18 @@ void Server::run() {
 
 	sf::Clock clock;
 	while(Run) {
-		//if(clock.getElapsedTime().asSeconds() >= 1) { //Debug delay to fix mutex access violations
-			if(!isFull() && !Listening) {
-				Listening = true;
-				AccepterThread->launch();
-			}
-		//}
+		if(!isFull() && !Listening) {
+			Listening = true;
+			AccepterThread->launch();
+		}
 
 		sf::Packet packet; sf::IpAddress ip; sf::Uint16 port;
 		if(Socket.receive(packet, ip, port) == sf::Socket::Done) {
-			sf::Uint16 type;
-			packet >> type;
-
-			switch(type) {
-				case Server::PacketTypeIn::CONNECT: // A guy is trying to connect to the public(server) port, guide him to an open slot.
-					std::wstring password;
-					packet >> password;
-					
-					sf::Packet send;
-
-					std::string ipString = ip.toString();
-
-					if(password.compare(config.password) == 0 || config.password.compare(L"") == 0) {
-						if(isFull()) {
-							writeToLog(std::wstring(L"{RDConnect error: Server full} - {YD") + std::wstring(ipString.begin(), ipString.end()) + L"}"); 
-							send << (sf::Uint16)Server::PacketTypeOut::CONNECTFAILURE << std::wstring(L"Server is full.");
-						} else {
-							send << (sf::Uint16)Server::PacketTypeOut::CONNECTSUCCESS << (sf::Uint16)Listener.getLocalPort();
-						}
-					} else {
-						writeToLog(std::wstring(L"{RDConnect error: Wrong password} - {YD") + std::wstring(ipString.begin(), ipString.end()) + L"}"); 
-						send << (sf::Uint16)Server::PacketTypeOut::CONNECTFAILURE << std::wstring(L"Connect error: Wrong password.");
-					}
-					
-
-					Socket.send(send, ip, port);
-					break;
-
-				//default:
-					break;
+			if(handleUDPPacket(packet, ip, port)) {
+				//Success
+			} else {
+				std::wstringstream ss; ss << L"Packet error on {YDUDP Socket}.";
+				writeToLog(ss.str());
 			}
 		}
 	}
@@ -176,9 +159,14 @@ void Server::run() {
 sf::Uint16 Server::calcAvgPing() { //Weighted average
 	sf::Uint16 temp(0), count(0);
 	for(sf::Uint16 i = 0; i < Clients.size(); i++) {
-		if(!Clients.at(i)->isDead()) {temp+=Clients.at(i)->getPing()*Clients.at(i)->getPing(); count++;}
+		if(!Clients.at(i)->isDead()) {temp+=Clients.at(i)->getPing(); count++;}
 	}
-	return temp/(count*count);
+	
+	if(count != 0) {
+		return temp/count;
+	} else {
+		return 0;
+	}
 }
 
 

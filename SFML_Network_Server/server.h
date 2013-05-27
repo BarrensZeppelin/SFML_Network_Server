@@ -19,16 +19,19 @@ private:
 
 	static sf::Thread * AccepterThread;
 	static sf::Thread * MainThread;
+	static sf::Thread * PacketQueueThread;
 
 	static bool Run;
 	static bool Listening;
 
 	static sf::Mutex clientAccess;
 
+	static void runAccepter();
+	static void run();
 
+	static void handlePacketQueue();
 public:
-	enum PacketTypeIn {CONNECT};
-	enum PacketTypeOut {CONNECTSUCCESS, CONNECTFAILURE};
+	static bool handleUDPPacket(sf::Packet& packet, const sf::IpAddress& ip, const sf::Uint16 port);
 
 	static sf::Uint16 Port;
 
@@ -37,9 +40,7 @@ public:
 	static bool init();
 	static void terminate();
 
-	static void runAccepter();
-
-	static void run();
+	
 
 	static sf::Uint16 calcAvgPing();
 
